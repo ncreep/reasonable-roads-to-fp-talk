@@ -1,241 +1,155 @@
-import { UserId, ProductId, CampaignId } from './ids'
+import { UserId, OrderId, PackageId, ItemId } from './ids'
+import _ from 'lodash'
 
 export type User = {
   readonly id: UserId
   readonly membershipLevel: "regular" | "premium"
 }
 
-export type Discount = {
-  readonly code: string
-  readonly percent: number
-  readonly campaignId: CampaignId
-}
-
-export type Product = {
-  readonly id: ProductId
-  readonly basePrice: number
-  readonly discounts: readonly Discount[]
-}
-
-export type AppliedDiscount = {
-  readonly discount: Discount
-  readonly amount: number
-}
-
-export type FinalPrice = {
-  readonly product: Product
+export type Item = {
+  readonly id: ItemId
+  readonly name: string
   readonly price: number
+  readonly weight: number
+  readonly labels: readonly string[]
 }
 
-type ProductWith<T> = {
-  readonly product: Product
-  readonly value: T
+export type Warehouse = { readonly value: string }
+export const Warehouse = (value: string): Warehouse => ({ value })
+
+export type Package = {
+  readonly id: PackageId
+  readonly warehouse: Warehouse
+  readonly items: Item[]
 }
 
-export type DiscountedTotal = {
-  readonly appliedDiscounts: ReadonlyMap<CampaignId, number>
-  readonly finalPrices: ReadonlyMap<Product, number>
-  readonly total: number
+export type Order = {
+  readonly id: OrderId
+  readonly customerId: UserId
+  readonly packages: Package[]
 }
 
-export type LoyaltyProgram = {
-  addPoints(userId: UserId, amount: number): void
+export type ItemInfo = {
+  readonly order: Order
+  readonly package: Package
+  readonly item: Item
 }
 
-export type MarketingBudget = {
-  allocate(campaignId: CampaignId, amount: number): void
+export type ItemInfoWithDiscount = ItemInfo & {
+  consolidationDiscount: number
 }
 
-export type Tax = {
-  recordTransaction(userId: UserId, productId: ProductId, amount: number): void
+export type ShippingDirective = {
+  readonly order: Order
+  readonly package: Package
+  readonly item: Item
+  readonly shippingCost: number
+  readonly consolidationDiscount: number
 }
 
-export type DB = {
-  getProductsByIds(ids: ProductId[]): Product[]
-  getUserCart(userId: UserId): ProductId[]
+export type WarehouseSystem = {
+  notifyPackageReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId): void
+  notifyPackagesReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId[]): void
 }
 
-export type CartFetcher = {
-  fetch(user: User): Product[]
+export type CustomerNotifications = {
+  notifyItemShipping(customerId: UserId, itemId: ItemId, itemName: string): void
 }
 
-export type Billing = {
-  bill(user: User, total: number): void
+export type ShippingHandler = {
+  dispatch(directives: ShippingDirective[]): void
 }
 
-export const premiumDiscount: Discount =
-  { code: 'MEMBER20', percent: 20, campaignId: CampaignId('premium-member') }
-
-export function getUserDiscounts(user: User): Discount[] {
-  return (user.membershipLevel === 'premium') ?
-    [premiumDiscount] :
-    []
+export type OrderFetcher = {
+  fetch(orderId: OrderId): Order
 }
 
-export class CheckoutService {
+export class OrderFulfillmentService {
   constructor(
-    private readonly cartFetcher: CartFetcher,
-    private readonly loyaltyProgram: LoyaltyProgram,
-    private readonly marketingBudget: MarketingBudget,
-    private readonly tax: Tax,
-    private readonly billing: Billing
+    private readonly orderFetcher: OrderFetcher,
+    private readonly warehouseSystem: WarehouseSystem,
+    private readonly customerNotifications: CustomerNotifications,
+    private readonly shippingHandler: ShippingHandler
   ) { }
 
-  processCheckout(user: User): void {
-    const products = this.cartFetcher.fetch(user)
+  processShipping(orderId: OrderId, user: User): void {
+    const order = this.orderFetcher.fetch(orderId)
 
-    const userDiscounts = getUserDiscounts(user)
+    const directives = calculateShippingDirectives(order, user)
 
-    const discountedTotal = calcTotal(products, userDiscounts)
+    this.performSideEffects(orderId, directives)
 
-    discountedTotal.appliedDiscounts.forEach((amount, campaignId) =>
-      this.marketingBudget.allocate(campaignId, amount)
-    )
+    this.shippingHandler.dispatch(directives)
+  }
 
-    discountedTotal.finalPrices.forEach((finalPrice, product) => {
-      this.loyaltyProgram.addPoints(user.id, product.basePrice)
-      this.tax.recordTransaction(user.id, product.id, finalPrice)
-    })
-
-    this.billing.bill(user, discountedTotal.total)
+  private performSideEffects(orderId: OrderId, directives: ShippingDirective[]): void {
+    _(directives)
+      .forEach(directive => {
+        this.customerNotifications.notifyItemShipping(
+          directive.order.customerId,
+          directive.item.id,
+          directive.item.name
+        )
+      })
+      .groupBy(d => d.package.warehouse.value)
+      .forEach((warehouseDirectives, warehouse) => {
+        const packageIds = _.uniq(warehouseDirectives.map(d => d.package.id))
+        this.warehouseSystem.notifyPackagesReady(Warehouse(warehouse), orderId, packageIds)
+      }).value()
   }
 }
 
-import _ from 'lodash'
-
-type ProductWithDiscounts = {
-  product: Product
-  allDiscounts: Discount[]
+export function calculateShippingDirectives(order: Order, user: User): ShippingDirective[] {
+  return _(order.packages)
+    .flatMap(toItems(order))
+    .map(addPremiumLabels(user))
+    .groupBy(byWarehouse)
+    .flatMap(addConsolidationDiscount)
+    .map(toShippingDirective)
+    .value()
 }
 
-type DiscountApplication = {
-  campaignId: CampaignId
-  amount: number
-}
-
-const enrichWithUserDiscounts = (userDiscounts: Discount[]) => (product: Product): ProductWithDiscounts => ({
-  product,
-  allDiscounts: [...userDiscounts, ...product.discounts]
+const withLabels = (item: Item, ...newLabels: string[]): Item => ({
+  ...item,
+  labels: [...item.labels, ...newLabels]
 })
 
-const calculateDiscountAmount = (basePrice: number) => (discount: Discount): DiscountApplication => ({
-  campaignId: discount.campaignId,
-  amount: basePrice * (discount.percent / 100)
+const addPremiumLabels = (user: User) => (itemInfo: ItemInfo): ItemInfo => ({
+  ...itemInfo,
+  item: user.membershipLevel === 'premium'
+    ? withLabels(itemInfo.item, 'PRIORITY', 'VIP_CUSTOMER')
+    : itemInfo.item
 })
 
-const toDiscountApplications = ({ product, allDiscounts }: ProductWithDiscounts): DiscountApplication[] =>
-  _.map(allDiscounts, calculateDiscountAmount(product.basePrice))
+const toItemInfo = (order: Order, pkg: Package) => (item: Item): ItemInfo => ({
+  order,
+  package: pkg,
+  item
+})
 
-const sumApplications = ([campaignId, applications]: [CampaignId, DiscountApplication[]]): [CampaignId, number] =>
-  [campaignId, _.sumBy(applications, 'amount')]
+const addConsolidationDiscount = (warehouseItems: ItemInfo[]): ItemInfoWithDiscount[] => {
+  const itemCount = warehouseItems.length
+  const discountPercent = itemCount >= 10 ? 0.20
+    : itemCount >= 5 ? 0.10
+      : itemCount >= 3 ? 0.05
+        : 0
 
-const calculateFinalPrice = ({ product, allDiscounts }: ProductWithDiscounts): [Product, number] => {
-  const totalDiscount = _.sumBy(allDiscounts, d => d.percent / 100) * product.basePrice
-  return [product, product.basePrice - totalDiscount]
+  return warehouseItems.map(itemInfo => ({
+    ...itemInfo,
+    consolidationDiscount: itemInfo.item.price * discountPercent
+  }))
 }
 
-export function calcTotal(products: Product[], userDiscounts: Discount[]): DiscountedTotal {
-  const productsWithDiscounts = _.map(products, enrichWithUserDiscounts(userDiscounts))
+const toShippingDirective = (itemInfo: ItemInfoWithDiscount): ShippingDirective => ({
+  order: itemInfo.order,
+  package: itemInfo.package,
+  item: itemInfo.item,
+  shippingCost: itemInfo.item.weight * 2.5 + (itemInfo.item.price > 100 ? 0 : 5),
+  consolidationDiscount: itemInfo.consolidationDiscount
+})
 
-  const discountApplications = _.flatMap(productsWithDiscounts, toDiscountApplications)
+const toItems = (order: Order) => (pkg: Package): ItemInfo[] =>
+  pkg.items.map(toItemInfo(order, pkg))
 
-  const appliedDiscountsMap = new Map(
-    Array.from(
-      Map.groupBy(discountApplications, app => app.campaignId),
-      sumApplications
-    )
-  )
-
-  const finalPricesMap = new Map(
-    _.map(productsWithDiscounts, calculateFinalPrice)
-  )
-
-  const total = _.sum([...finalPricesMap.values()])
-
-  return {
-    appliedDiscounts: appliedDiscountsMap,
-    finalPrices: finalPricesMap,
-    total
-  }
-}
-
-// TODO do not touch
-// import _ from 'lodash'
-//
-// const applyDiscounts = (withDiscounts: ProductWith<Discount[]>): ProductWith<AppliedDiscount>[] => {
-//   return _.map(withDiscounts.value, applyDiscount(withDiscounts.product))
-// }
-//
-// const applyDiscount = (product: Product) => (discount: Discount): ProductWith<AppliedDiscount> => {
-//   const amount = product.basePrice * (discount.percent / 100)
-//
-//   return {
-//     product,
-//     value: {
-//       amount,
-//       discount
-//     }
-//   }
-// }
-//
-// const mapWithProduct = <T, U>(p: ProductWith<T>, f: (value: T) => U): ProductWith<U> =>
-// ({
-//   product: p.product,
-//   value: f(p.value)
-// })
-//
-// const withUserDiscounts = (userDiscounts: Discount[]) => (product: Product): ProductWith<Discount[]> => ({
-//   product,
-//   value: [...userDiscounts, ...product.discounts]
-// })
-//
-// function toFinalPrice(value: ProductWith<AppliedDiscount>): ProductWith {
-//
-// }
-//
-// const getValue = <T>(p: ProductWith<T>) => p.value
-//
-// export function calcTotal2(products: Product[], userDiscounts: Discount[]): DiscountedTotal {
-//   const a = _.map(products, withUserDiscounts(userDiscounts))
-//   const b = _.flatMap(a, applyDiscounts)
-//   const c = _.flatMap(b, getValue)
-//   const d = _.flatMap(b, toFinalPrice)
-//
-//   const appliedDiscounts: AppliedDiscount[] = []
-//   const finalPrices: FinalPrice[] = []
-//
-//   let total = 0
-//
-//   for (const p of products) {
-//     const allDiscounts = [...userDiscounts, ...p.discounts]
-//
-//     let totalDiscount = 0
-//
-//     for (const d of allDiscounts) {
-//       const discountAmount = p.basePrice * (d.percent / 100)
-//
-//       appliedDiscounts.push({
-//         discount: d,
-//         amount: discountAmount
-//       })
-//
-//       totalDiscount += discountAmount
-//     }
-//
-//     const discountedPrice = p.basePrice - totalDiscount
-//
-//     finalPrices.push({
-//       product: p,
-//       price: discountedPrice
-//     })
-//
-//     total += discountedPrice
-//   }
-//
-//   return {
-//     appliedDiscounts,
-//     finalPrices,
-//     total
-//   }
-// }
-//
+const byWarehouse =
+  (itemInfo: ItemInfo) => itemInfo.package.warehouse
