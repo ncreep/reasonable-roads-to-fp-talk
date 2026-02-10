@@ -1,63 +1,12 @@
-import { UserId, OrderId, PackageId, ItemId, Warehouse } from './types'
+import { OrderId, Warehouse, User, Item, Package, Order, ShippingDirective, WarehouseSystem, CustomerNotifications, OrderFetcher, ShippingHandler } from './types'
 import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels } from './utils'
 import _ from 'lodash'
-
-export type User = {
-  readonly id: UserId
-  readonly membershipLevel: "regular" | "premium"
-}
-
-export type Item = {
-  readonly id: ItemId
-  readonly name: string
-  readonly price: number
-  readonly weight: number
-  readonly labels: readonly string[]
-}
-
-export type Package = {
-  readonly id: PackageId
-  readonly warehouse: Warehouse
-  readonly items: Item[]
-}
-
-export type Order = {
-  readonly id: OrderId
-  readonly customerId: UserId
-  readonly packages: Package[]
-}
 
 export type ItemInfo = {
   readonly order: Order
   readonly package: Package
   readonly item: Item
   readonly labels: readonly string[]
-}
-
-export type ShippingDirective = {
-  readonly order: Order
-  readonly package: Package
-  readonly itemId: ItemId
-  readonly shippingCost: number
-  readonly labels: readonly string[]
-  readonly consolidationDiscount: number
-}
-
-export type WarehouseSystem = {
-  notifyPackageReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId): void
-  notifyPackagesReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId[]): void
-}
-
-export type CustomerNotifications = {
-  notifyItemShipping(customerId: UserId, itemId: ItemId): void
-}
-
-export type ShippingHandler = {
-  dispatch(directives: ShippingDirective[]): void
-}
-
-export type OrderFetcher = {
-  fetch(orderId: OrderId): Order
 }
 
 export class OrderFulfillmentService {

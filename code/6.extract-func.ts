@@ -1,51 +1,5 @@
-import { UserId, OrderId, PackageId, ItemId, Warehouse } from './types'
-import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, type User } from './utils'
-
-export type Item = {
-  readonly id: ItemId
-  readonly name: string
-  readonly price: number
-  readonly weight: number
-  readonly labels: readonly string[]
-}
-
-export type Package = {
-  readonly id: PackageId
-  readonly warehouse: Warehouse
-  readonly items: Item[]
-}
-
-export type Order = {
-  readonly id: OrderId
-  readonly customerId: UserId
-  readonly packages: Package[]
-}
-
-export type ShippingDirective = {
-  readonly order: Order
-  readonly package: Package
-  readonly itemId: ItemId
-  readonly shippingCost: number
-  readonly labels: readonly string[]
-  consolidationDiscount: number
-}
-
-export type WarehouseSystem = {
-  notifyPackageReady(warehouse: Warehouse, orderId: OrderId, packageId: PackageId): void
-  notifyPackagesReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId[]): void
-}
-
-export type CustomerNotifications = {
-  notifyItemShipping(customerId: UserId, itemId: ItemId): void
-}
-
-export type OrderFetcher = {
-  fetch(orderId: OrderId): Order
-}
-
-export type ShippingHandler = {
-  dispatch(directives: ShippingDirective[]): void
-}
+import { OrderId, Warehouse, Order, ShippingDirective, WarehouseSystem, CustomerNotifications, OrderFetcher, ShippingHandler } from './types'
+import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, withDiscount, type User } from './utils'
 
 export class OrderFulfillmentService {
   constructor(
@@ -89,11 +43,15 @@ export class OrderFulfillmentService {
       }
     }
 
+    const withDiscounts: ShippingDirective[] = []
     for (const directive of directives) {
       const warehouseItemCount = warehouseCounts.get(directive.package.warehouse)!
-      directive.consolidationDiscount = getConsolidationDiscount(warehouseItemCount)
+      const discount = getConsolidationDiscount(warehouseItemCount)
+      const newDirective = withDiscount(directive, discount)
+
+      withDiscounts.push(newDirective)
     }
 
-    return directives
+    return withDiscounts
   }
 }

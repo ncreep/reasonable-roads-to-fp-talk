@@ -1,34 +1,5 @@
-import { UserId, OrderId, PackageId, ItemId, Warehouse } from './types'
-import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, type User } from './utils'
-
-export type Item = {
-  readonly id: ItemId
-  readonly name: string
-  readonly price: number
-  readonly weight: number
-  readonly labels: readonly string[]
-}
-
-export type Package = {
-  readonly id: PackageId
-  readonly warehouse: Warehouse
-  readonly items: Item[]
-}
-
-export type Order = {
-  readonly id: OrderId
-  readonly customerId: UserId
-  readonly packages: Package[]
-}
-
-export type ShippingDirective = {
-  readonly order: Order
-  readonly package: Package
-  readonly itemId: ItemId
-  readonly shippingCost: number
-  readonly labels: readonly string[]
-  consolidationDiscount: number
-}
+import { UserId, OrderId, PackageId, ItemId, Warehouse, Item, Package, Order, ShippingDirective } from './types'
+import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, withDiscount, type User } from './utils'
 
 export const WarehouseSystem = {
   init(config: { test: boolean }) { },
@@ -128,10 +99,14 @@ export function processShipping(orderId: OrderId, user: User): void {
     }
   }
 
+  const withDiscounts: ShippingDirective[] = []
   for (const directive of directives) {
     const warehouseItemCount = warehouseCounts.get(directive.package.warehouse)!
-    directive.consolidationDiscount = getConsolidationDiscount(warehouseItemCount)
+    const discount = getConsolidationDiscount(warehouseItemCount)
+    const newDirective = withDiscount(directive, discount)
+
+    withDiscounts.push(newDirective)
   }
 
-  ShippingHandler.dispatch(directives)
+  ShippingHandler.dispatch(withDiscounts)
 }

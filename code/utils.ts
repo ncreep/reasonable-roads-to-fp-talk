@@ -1,9 +1,6 @@
-import { UserId } from './types'
+import { type User, type ShippingDirective } from './types'
 
-export type User = {
-  readonly id: UserId
-  readonly membershipLevel: string
-}
+export type { User }
 
 export function getConsolidationDiscount(itemCount: number): number {
   if (itemCount >= 10) return 0.20
@@ -20,3 +17,8 @@ export const withPremiumLabels = (user: User, labels: readonly string[]): readon
   user.membershipLevel === 'premium'
     ? [...labels, 'PRIORITY', 'VIP_CUSTOMER']
     : labels
+
+export const withDiscount = (directive: ShippingDirective, consolidationDiscount: number): ShippingDirective => ({
+  ...directive,
+  consolidationDiscount
+})
