@@ -1,136 +1,103 @@
-import { UserId, ProductId, CampaignId } from './ids'
+import { UserId, OrderId, PackageId, ItemId, Warehouse } from './types'
+import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, type User } from './utils'
 
-export type User = {
-  readonly id: UserId
-  readonly membershipLevel: string
-}
-
-export type Discount = {
-  readonly code: string
-  readonly percent: number
-  readonly campaignId: CampaignId
-}
-
-export type Product = {
-  readonly id: ProductId
-  readonly basePrice: number
-  readonly discounts: readonly Discount[]
-}
-
-export type AppliedDiscount = {
-  readonly discount: Discount
-  readonly amount: number
-}
-
-export type FinalPrice = {
-  readonly product: Product
+export type Item = {
+  readonly id: ItemId
+  readonly name: string
   readonly price: number
+  readonly weight: number
+  readonly labels: readonly string[]
 }
 
-export type DiscountedTotal = {
-  readonly appliedDiscounts: readonly AppliedDiscount[]
-  readonly finalPrices: readonly FinalPrice[]
-  readonly total: number
+export type Package = {
+  readonly id: PackageId
+  readonly warehouse: Warehouse
+  readonly items: Item[]
 }
 
-export type LoyaltyProgram = {
-  addPoints(userId: UserId, amount: number): void
+export type Order = {
+  readonly id: OrderId
+  readonly customerId: UserId
+  readonly packages: Package[]
 }
 
-export type MarketingBudget = {
-  allocate(campaignId: CampaignId, amount: number): void
+export type ShippingDirective = {
+  readonly order: Order
+  readonly package: Package
+  readonly itemId: ItemId
+  readonly shippingCost: number
+  readonly labels: readonly string[]
+  consolidationDiscount: number
 }
 
-export type Tax = {
-  recordTransaction(userId: UserId, productId: ProductId, amount: number): void
+export type WarehouseSystem = {
+  notifyPackageReady(warehouse: Warehouse, orderId: OrderId, packageId: PackageId): void
+  notifyPackagesReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId[]): void
 }
 
-export type DB = {
-  getProductsByIds(ids: ProductId[]): Product[]
-  getUserCart(userId: UserId): ProductId[]
+export type CustomerNotifications = {
+  notifyItemShipping(customerId: UserId, itemId: ItemId): void
 }
 
-export type CartFetcher = {
-  fetch(user: User): Product[]
+export type OrderFetcher = {
+  fetch(orderId: OrderId): Order
 }
 
-export type Billing = {
-  bill(user: User, total: number): void
+export type ShippingHandler = {
+  dispatch(directives: ShippingDirective[]): void
 }
 
-export const premiumDiscount: Discount =
-  { code: 'MEMBER20', percent: 20, campaignId: CampaignId('premium-member') }
-
-export function getUserDiscounts(user: User): Discount[] {
-  return (user.membershipLevel === 'premium') ?
-    [premiumDiscount] :
-    []
-}
-
-export class CheckoutService {
+export class OrderFulfillmentService {
   constructor(
-    private readonly cartFetcher: CartFetcher,
-    private readonly loyaltyProgram: LoyaltyProgram,
-    private readonly marketingBudget: MarketingBudget,
-    private readonly tax: Tax,
-    private readonly billing: Billing
-  ) { }
+    private readonly orderFetcher: OrderFetcher,
+    private readonly warehouseSystem: WarehouseSystem,
+    private readonly customerNotifications: CustomerNotifications,
+    private readonly shippingHandler: ShippingHandler
+  ) {}
 
-  processCheckout(user: User): void {
-    const products = this.cartFetcher.fetch(user)
+  processShipping(orderId: OrderId, user: User): void {
+    const order = this.orderFetcher.fetch(orderId)
 
-    const userDiscounts = getUserDiscounts(user)
+    const directives = calculateShippingDirectives(order, user)
 
-    const discountedTotal = calcTotal(products, userDiscounts)
+    for (const pkg of order.packages) {
+      this.warehouseSystem.notifyPackageReady(pkg.warehouse, orderId, pkg.id)
 
-    discountedTotal.appliedDiscounts.forEach(ad =>
-      this.marketingBudget.allocate(ad.discount.campaignId, ad.amount)
-    )
-
-    discountedTotal.finalPrices.forEach(fp => {
-      this.loyaltyProgram.addPoints(user.id, fp.product.basePrice)
-      this.tax.recordTransaction(user.id, fp.product.id, fp.price)
-    })
-
-    this.billing.bill(user, discountedTotal.total)
-  }
-}
-
-export function calcTotal(products: Product[], userDiscounts: Discount[]): DiscountedTotal {
-  const appliedDiscounts: AppliedDiscount[] = []
-  const finalPrices: FinalPrice[] = []
-
-  let total = 0
-
-  for (const p of products) {
-    const allDiscounts = [...userDiscounts, ...p.discounts]
-
-    let totalDiscount = 0
-
-    for (const d of allDiscounts) {
-      const discountAmount = p.basePrice * (d.percent / 100)
-
-      appliedDiscounts.push({
-        discount: d,
-        amount: discountAmount
-      })
-
-      totalDiscount += discountAmount
+      for (const item of pkg.items) {
+        this.customerNotifications.notifyItemShipping(order.customerId, item.id)
+      }
     }
 
-    const discountedPrice = p.basePrice - totalDiscount
+    this.shippingHandler.dispatch(directives)
+  }
+}
 
-    finalPrices.push({
-      product: p,
-      price: discountedPrice
-    })
+export function calculateShippingDirectives(order: Order, user: User): ShippingDirective[] {
+  const directives: ShippingDirective[] = []
+  const warehouseCounts = new Map<Warehouse, number>()
 
-    total += discountedPrice
+  for (const pkg of order.packages) {
+    const currentCount = warehouseCounts.get(pkg.warehouse) || 0
+    warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
+
+    for (const item of pkg.items) {
+      const shippingCost = calculateShippingCost(item.weight, item.price)
+
+      directives.push({
+        order,
+        package: pkg,
+        itemId: item.id,
+        labels: withPremiumLabels(user, item.labels),
+        shippingCost,
+        consolidationDiscount: 0
+      })
+    }
   }
 
-  return {
-    appliedDiscounts,
-    finalPrices,
-    total
+  for (const directive of directives) {
+    const warehouseItemCount = warehouseCounts.get(directive.package.warehouse)!
+    directive.consolidationDiscount = getConsolidationDiscount(warehouseItemCount)
   }
+
+  return directives
 }

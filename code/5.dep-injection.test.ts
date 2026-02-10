@@ -1,45 +1,40 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it } from 'vitest'
 import {
-  CheckoutService,
-  type LoyaltyProgram,
-  type MarketingBudget,
-  type Tax,
-  type DB,
-  type CartFetcher,
-  type Billing,
-  type User
+  OrderFulfillmentService,
+  type WarehouseSystem,
+  type CustomerNotifications,
+  type OrderFetcher,
+  type ShippingHandler,
 } from './4.dep-injection'
 
-describe('processCheckout', () => {
-  it('should process checkout', () => {
-    const loyaltyProgram: LoyaltyProgram = {
-      addPoints(userId: string, amount: number): void { }
+describe('processShipping', () => {
+  it('should process shipping', () => {
+    const warehouseSystem: WarehouseSystem = {
+      notifyPackageReady(warehouse, orderId, packageId): void { },
+      notifyPackagesReady(warehouse, orderId, packages): void { }
     }
 
-    const marketingBudget: MarketingBudget = {
-      allocate(campaignId: string, amount: number): void { }
-    }
-
-    const tax: Tax = {
-      recordTransaction(userId: string, productId: string, amount: number): void { }
+    const customerNotifications: CustomerNotifications = {
+      notifyItemShipping(customerId, item): void { }
     }
 
     // TODO point out how DB is no longer needed
 
-    const cartFetcher: CartFetcher = {
-      fetch(user: User) { return [] }
+    const orderFetcher: OrderFetcher = {
+      fetch(orderId) {
+        throw new Error("not implemented")
+      }
     }
 
-    const billing: Billing = {
-      bill(user: User, total: number): void { }
+    const shippingHandler: ShippingHandler = {
+      dispatch(directives): void { }
     }
 
-    const checkoutService = new CheckoutService(
-      cartFetcher,
-      loyaltyProgram,
-      marketingBudget,
-      tax,
-      billing
+    const orderFulfillmentService = new OrderFulfillmentService(
+      orderFetcher,
+      warehouseSystem,
+      customerNotifications,
+      shippingHandler
     )
 
     // ... actual test

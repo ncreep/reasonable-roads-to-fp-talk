@@ -1,103 +1,151 @@
-import { UserId, ProductId, CampaignId } from './ids'
+import { UserId, OrderId, PackageId, ItemId, Warehouse } from './types'
+import { getConsolidationDiscount, calculateShippingCost } from './utils'
 
 export type User = {
   id: UserId
   membershipLevel: string
 }
 
-export type Discount = {
-  code: string
-  percent: number
-  campaignId: CampaignId
+export type Item = {
+  id: ItemId
+  name: string
+  price: number
+  weight: number
+  labels: string[]
 }
 
-export type Product = {
-  id: ProductId
-  basePrice: number
-  discounts: Discount[]
+export type Package = {
+  id: PackageId
+  warehouse: Warehouse
+  items: Item[]
 }
 
-export const LoyaltyProgram = {
+export type Order = {
+  id: OrderId
+  customerId: UserId
+  packages: Package[]
+}
+
+export type ShippingDirective = {
+  order: Order
+  package: Package
+  itemId: ItemId
+  shippingCost: number
+  labels: string[]
+  consolidationDiscount: number
+}
+
+export const WarehouseSystem = {
   init(config: { test: boolean }) { },
 
-  addPoints(userId: UserId, amount: number): void { }
+  notifyPackageReady(warehouse: Warehouse, orderId: OrderId, packageId: PackageId): void { },
+  notifyPackagesReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId[]): void { }
 }
 
-export const MarketingBudget = {
+export const CustomerNotifications = {
   init(config: { test: boolean }) { },
 
-  allocate(campaignId: CampaignId, amount: number): void { }
-}
-
-export const Tax = {
-  init(config: { test: boolean }) { },
-
-  recordTransaction(userId: UserId, productId: ProductId, amount: number): void { }
+  notifyItemShipping(customerId: UserId, itemId: ItemId): void { }
 }
 
 export const DB = {
   init(config: { test: boolean }) { },
 
-  getProductsByIds(ids: ProductId[]): Product[] { return [] },
+  getItemById(id: ItemId): Item { throw new Error('Not implemented') },
 
-  getUserCart(userId: UserId): ProductId[] { return [] }
-}
+  getOrderPackages(orderId: OrderId): { packageId: PackageId, warehouse: Warehouse, itemIds: ItemId[] }[] {
+    return []
+  },
 
-export const CartFetcher = {
-  cache: new Map<UserId, Product[]>(),
-
-  init(config: { test: boolean }) { },
-
-  fetch(user: User): Product[] {
-    if (this.cache.has(user.id)) {
-      return this.cache.get(user.id)!
-    }
-
-    const productIds = DB.getUserCart(user.id)
-    const products = DB.getProductsByIds(productIds)
-
-    this.cache.set(user.id, products)
-    return products
+  getOrderCustomer(orderId: OrderId): UserId {
+    return UserId('')
   }
 }
 
-export const Billing = {
+export const OrderFetcher = {
+  itemCache: new Map<ItemId, Item>(),
+
   init(config: { test: boolean }) { },
 
-  bill(user: User, total: number): void { }
+  fetch(orderId: OrderId): Order {
+    const customerId = DB.getOrderCustomer(orderId)
+    const packageData = DB.getOrderPackages(orderId)
+
+    const packages: Package[] = packageData.map(pkgData => {
+      let items: Item[] = []
+
+      for (const itemId of pkgData.itemIds) {
+        if (this.itemCache.has(itemId)) {
+          items.push(this.itemCache.get(itemId)!)
+        } else {
+          const item = DB.getItemById(itemId)
+          this.itemCache.set(item.id, item)
+          items.push(item)
+        }
+      }
+
+      return {
+        id: pkgData.packageId,
+        warehouse: pkgData.warehouse,
+        items
+      }
+    })
+
+    return {
+      id: orderId,
+      customerId,
+      packages
+    }
+  }
 }
 
-export const premiumDiscount: Discount =
-  { code: 'MEMBER20', percent: 20, campaignId: CampaignId('premium-member') }
+export const ShippingHandler = {
+  init(config: { test: boolean }) { },
 
-export function processCheckout(user: User): void {
-  const products = CartFetcher.fetch(user)
+  dispatch(directives: ShippingDirective[]): void { }
+}
+
+export function processShipping(orderId: OrderId, user: User): void {
+  const order = OrderFetcher.fetch(orderId)
 
   if (user.membershipLevel === 'premium') {
-    for (const p of products) {
-      p.discounts.push(premiumDiscount)
+    for (const pkg of order.packages) {
+      for (const item of pkg.items) {
+        item.labels.push('PRIORITY')
+        item.labels.push('VIP_CUSTOMER')
+      }
     }
   }
 
-  let total = 0
+  const directives: ShippingDirective[] = []
+  const warehouseCounts = new Map<Warehouse, number>()
 
-  for (const p of products) {
-    LoyaltyProgram.addPoints(user.id, p.basePrice)
+  for (const pkg of order.packages) {
+    WarehouseSystem.notifyPackageReady(pkg.warehouse, orderId, pkg.id)
 
-    let totalDiscount = 0
+    const currentCount = warehouseCounts.get(pkg.warehouse) || 0
+    warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
 
-    for (const d of p.discounts) {
-      const discountAmount = p.basePrice * (d.percent / 100)
-      MarketingBudget.allocate(d.campaignId, discountAmount)
+    for (const item of pkg.items) {
+      CustomerNotifications.notifyItemShipping(order.customerId, item.id)
 
-      totalDiscount += discountAmount
+      const shippingCost = calculateShippingCost(item.weight, item.price)
+
+      directives.push({
+        order,
+        package: pkg,
+        itemId: item.id,
+        labels: item.labels,
+        shippingCost,
+        consolidationDiscount: 0
+      })
     }
-
-    const discountedPrice = p.basePrice - totalDiscount
-    Tax.recordTransaction(user.id, p.id, discountedPrice)
-
-    total += discountedPrice
   }
 
-  Billing.bill(user, total)
+  for (const directive of directives) {
+    const warehouseItemCount = warehouseCounts.get(directive.package.warehouse)!
+    directive.consolidationDiscount = getConsolidationDiscount(warehouseItemCount)
+  }
+
+  ShippingHandler.dispatch(directives)
 }

@@ -1,4 +1,5 @@
-import { UserId, OrderId, PackageId, ItemId } from './ids'
+import { UserId, OrderId, PackageId, ItemId, Warehouse } from './types'
+import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels } from './utils'
 import _ from 'lodash'
 
 export type User = {
@@ -13,9 +14,6 @@ export type Item = {
   readonly weight: number
   readonly labels: readonly string[]
 }
-
-export type Warehouse = { readonly value: string }
-export const Warehouse = (value: string): Warehouse => ({ value })
 
 export type Package = {
   readonly id: PackageId
@@ -33,17 +31,15 @@ export type ItemInfo = {
   readonly order: Order
   readonly package: Package
   readonly item: Item
-}
-
-export type ItemInfoWithDiscount = ItemInfo & {
-  consolidationDiscount: number
+  readonly labels: readonly string[]
 }
 
 export type ShippingDirective = {
   readonly order: Order
   readonly package: Package
-  readonly item: Item
+  readonly itemId: ItemId
   readonly shippingCost: number
+  readonly labels: readonly string[]
   readonly consolidationDiscount: number
 }
 
@@ -53,7 +49,7 @@ export type WarehouseSystem = {
 }
 
 export type CustomerNotifications = {
-  notifyItemShipping(customerId: UserId, itemId: ItemId, itemName: string): void
+  notifyItemShipping(customerId: UserId, itemId: ItemId): void
 }
 
 export type ShippingHandler = {
@@ -77,79 +73,70 @@ export class OrderFulfillmentService {
 
     const directives = calculateShippingDirectives(order, user)
 
-    this.performSideEffects(orderId, directives)
+    this.fireNotifications(orderId, directives)
 
     this.shippingHandler.dispatch(directives)
   }
 
-  private performSideEffects(orderId: OrderId, directives: ShippingDirective[]): void {
+  private fireNotifications(orderId: OrderId, directives: ShippingDirective[]): void {
     _(directives)
-      .forEach(directive => {
-        this.customerNotifications.notifyItemShipping(
-          directive.order.customerId,
-          directive.item.id,
-          directive.item.name
-        )
-      })
-      .groupBy(d => d.package.warehouse.value)
-      .forEach((warehouseDirectives, warehouse) => {
-        const packageIds = _.uniq(warehouseDirectives.map(d => d.package.id))
-        this.warehouseSystem.notifyPackagesReady(Warehouse(warehouse), orderId, packageIds)
-      }).value()
+      .forEach(this.notifyItemShipping)
+      .groupBy(warehouse)
+      .forEach(this.notifyPackagesReady(orderId))
+      .value()
   }
+
+  private notifyItemShipping = (directive: ShippingDirective) => {
+    this.customerNotifications.notifyItemShipping(
+      directive.order.customerId,
+      directive.itemId
+    )
+  }
+
+  private notifyPackagesReady = (orderId: OrderId) =>
+    (warehouseDirectives: ShippingDirective[], warehouse: string) => {
+      const packageIds = _.uniq(warehouseDirectives.map(d => d.package.id))
+      this.warehouseSystem.notifyPackagesReady(Warehouse(warehouse), orderId, packageIds)
+    }
 }
 
 export function calculateShippingDirectives(order: Order, user: User): ShippingDirective[] {
   return _(order.packages)
     .flatMap(toItems(order))
     .map(addPremiumLabels(user))
-    .groupBy(byWarehouse)
+    .groupBy(warehouse)
     .flatMap(addConsolidationDiscount)
-    .map(toShippingDirective)
     .value()
 }
 
-const withLabels = (item: Item, ...newLabels: string[]): Item => ({
-  ...item,
-  labels: [...item.labels, ...newLabels]
-})
-
-const addPremiumLabels = (user: User) => (itemInfo: ItemInfo): ItemInfo => ({
-  ...itemInfo,
-  item: user.membershipLevel === 'premium'
-    ? withLabels(itemInfo.item, 'PRIORITY', 'VIP_CUSTOMER')
-    : itemInfo.item
+const addPremiumLabels = (user: User) => (info: ItemInfo): ItemInfo => ({
+  ...info,
+  labels: withPremiumLabels(user, info.item.labels)
 })
 
 const toItemInfo = (order: Order, pkg: Package) => (item: Item): ItemInfo => ({
   order,
   package: pkg,
-  item
+  item,
+  labels: item.labels
 })
 
-const addConsolidationDiscount = (warehouseItems: ItemInfo[]): ItemInfoWithDiscount[] => {
+const addConsolidationDiscount = (warehouseItems: ItemInfo[]): ShippingDirective[] => {
   const itemCount = warehouseItems.length
-  const discountPercent = itemCount >= 10 ? 0.20
-    : itemCount >= 5 ? 0.10
-      : itemCount >= 3 ? 0.05
-        : 0
+  const consolidationDiscount = getConsolidationDiscount(itemCount)
 
-  return warehouseItems.map(itemInfo => ({
-    ...itemInfo,
-    consolidationDiscount: itemInfo.item.price * discountPercent
+  return warehouseItems.map(info => ({
+    order: info.order,
+    package: info.package,
+    itemId: info.item.id,
+    labels: info.labels,
+    shippingCost: calculateShippingCost(info.item.weight, info.item.price),
+    consolidationDiscount
   }))
 }
-
-const toShippingDirective = (itemInfo: ItemInfoWithDiscount): ShippingDirective => ({
-  order: itemInfo.order,
-  package: itemInfo.package,
-  item: itemInfo.item,
-  shippingCost: itemInfo.item.weight * 2.5 + (itemInfo.item.price > 100 ? 0 : 5),
-  consolidationDiscount: itemInfo.consolidationDiscount
-})
 
 const toItems = (order: Order) => (pkg: Package): ItemInfo[] =>
   pkg.items.map(toItemInfo(order, pkg))
 
-const byWarehouse =
-  (itemInfo: ItemInfo) => itemInfo.package.warehouse
+const warehouse =
+  (withPackage: { package: Package }) => withPackage.package.warehouse

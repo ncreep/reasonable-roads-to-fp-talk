@@ -1,14 +1,13 @@
-import { describe, it, expect } from 'vitest'
-import { DB, CartFetcher, LoyaltyProgram, MarketingBudget, Tax, Billing } from './2.no-mutation'
+import { describe, it } from 'vitest'
+import { DB, OrderFetcher, WarehouseSystem, CustomerNotifications, ShippingHandler } from './2.no-mutation'
 
-describe('processCheckout', () => {
-  it('should process checkout', () => {
+describe('processShipping', () => {
+  it('should process shipping', () => {
     DB.init({ test: true })
-    CartFetcher.init({ test: true })
-    LoyaltyProgram.init({ test: true })
-    MarketingBudget.init({ test: true })
-    Tax.init({ test: true })
-    Billing.init({ test: true })
+    OrderFetcher.init({ test: true })
+    WarehouseSystem.init({ test: true })
+    CustomerNotifications.init({ test: true })
+    ShippingHandler.init({ test: true })
 
     // ... actual test
   })
