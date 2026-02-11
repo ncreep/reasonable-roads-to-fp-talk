@@ -58,7 +58,7 @@ export const DB = {
   },
 
   getOrderCustomer(orderId: OrderId): UserId {
-    return UserId('')
+    throw new Error('Not implemented')
   }
 }
 

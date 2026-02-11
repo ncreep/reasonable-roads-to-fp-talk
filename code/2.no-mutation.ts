@@ -2,38 +2,66 @@ import { UserId, OrderId, PackageId, ItemId, Warehouse, Item, Package, Order, Sh
 import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, withDiscount, type User } from './utils'
 
 export const WarehouseSystem = {
-  init(config: { test: boolean }) { },
+  initialized: false,
 
-  notifyPackageReady(warehouse: Warehouse, orderId: OrderId, packageId: PackageId): void { },
-  notifyPackagesReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId[]): void { }
+  init(config: { test: boolean }) {
+    this.initialized = true
+  },
+
+  notifyPackageReady(warehouse: Warehouse, orderId: OrderId, packageId: PackageId): void {
+    if (!this.initialized) throw new Error('WarehouseSystem not initialized')
+  },
+
+  notifyPackagesReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId[]): void {
+    if (!this.initialized) throw new Error('WarehouseSystem not initialized')
+  }
 }
 
 export const CustomerNotifications = {
-  init(config: { test: boolean }) { },
+  initialized: false,
 
-  notifyItemShipping(customerId: UserId, itemId: ItemId): void { }
+  init(config: { test: boolean }) {
+    this.initialized = true
+  },
+
+  notifyItemShipping(customerId: UserId, itemId: ItemId): void {
+    if (!this.initialized) throw new Error('CustomerNotifications not initialized')
+  }
 }
 
 export const DB = {
-  init(config: { test: boolean }) { },
+  initialized: false,
 
-  getItemById(id: ItemId): Item { throw new Error('Not implemented') },
+  init(config: { test: boolean }) {
+    this.initialized = true
+  },
+
+  getItemById(id: ItemId): Item {
+    if (!this.initialized) throw new Error('DB not initialized')
+    throw new Error('Not implemented')
+  },
 
   getOrderPackages(orderId: OrderId): { packageId: PackageId, warehouse: Warehouse, itemIds: ItemId[] }[] {
+    if (!this.initialized) throw new Error('DB not initialized')
     return []
   },
 
   getOrderCustomer(orderId: UserId): UserId {
-    return UserId('')
+    if (!this.initialized) throw new Error('DB not initialized')
+    throw new Error('Not implemented')
   }
 }
 
 export const OrderFetcher = {
   itemCache: new Map<ItemId, Item>(),
+  initialized: false,
 
-  init(config: { test: boolean }) { },
+  init(config: { test: boolean }) {
+    this.initialized = true
+  },
 
   fetch(orderId: OrderId): Order {
+    if (!this.initialized) throw new Error('OrderFetcher not initialized')
     const customerId = DB.getOrderCustomer(orderId)
     const packageData = DB.getOrderPackages(orderId)
 
@@ -71,9 +99,15 @@ export const OrderFetcher = {
 }
 
 export const ShippingHandler = {
-  init(config: { test: boolean }) { },
+  initialized: false,
 
-  dispatch(directives: ShippingDirective[]): void { }
+  init(config: { test: boolean }) {
+    this.initialized = true
+  },
+
+  dispatch(directives: ShippingDirective[]): void {
+    if (!this.initialized) throw new Error('ShippingHandler not initialized')
+  }
 }
 
 export function processShipping(orderId: OrderId, user: User): void {
