@@ -24,9 +24,9 @@ export class OrderFulfillmentService {
       warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
 
       for (const item of pkg.items) {
-        this.customerNotifications.notifyItemShipping(order.customerId, item.id)
-
         const shippingCost = calculateShippingCost(item.weight, item.price)
+
+        this.customerNotifications.notifyItemShipping(user.id, item.id, shippingCost)
 
         directives.push({
           order,

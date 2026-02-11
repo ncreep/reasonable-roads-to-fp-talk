@@ -22,7 +22,6 @@ export type Package = {
 
 export type Order = {
   id: OrderId
-  customerId: UserId
   packages: Package[]
 }
 
@@ -45,7 +44,7 @@ export const WarehouseSystem = {
 export const CustomerNotifications = {
   init(config: { test: boolean }) { },
 
-  notifyItemShipping(customerId: UserId, itemId: ItemId): void { }
+  notifyItemShipping(customerId: UserId, itemId: ItemId, shippingCost: ShippingCost): void { }
 }
 
 export const DB = {
@@ -68,7 +67,6 @@ export const OrderFetcher = {
   init(config: { test: boolean }) { },
 
   fetch(orderId: OrderId): Order {
-    const customerId = DB.getOrderCustomer(orderId)
     const packageData = DB.getOrderPackages(orderId)
 
     const packages: Package[] = []
@@ -98,7 +96,6 @@ export const OrderFetcher = {
 
     return {
       id: orderId,
-      customerId,
       packages
     }
   }
@@ -132,9 +129,9 @@ export function processShipping(orderId: OrderId, user: User): void {
     warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
 
     for (const item of pkg.items) {
-      CustomerNotifications.notifyItemShipping(order.customerId, item.id)
-
       const shippingCost = calculateShippingCost(item.weight, item.price)
+
+      CustomerNotifications.notifyItemShipping(user.id, item.id, shippingCost)
 
       directives.push({
         order,

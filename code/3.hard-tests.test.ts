@@ -16,8 +16,8 @@ describe('processShipping', () => {
       membershipLevel: MembershipLevel.premium
     }
 
+    // processShipping(orderId, user)
     // ... actual test
-    processShipping(orderId, user)
 
   })
 })

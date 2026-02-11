@@ -22,29 +22,32 @@ export class OrderFulfillmentService {
 
     const directives = calculateShippingDirectives(order, user)
 
-    this.fireNotifications(orderId, directives)
+    this.fireNotifications(user, order, directives)
 
     this.shippingHandler.dispatch(directives)
   }
 
-  private fireNotifications(orderId: OrderId, directives: ShippingDirective[]): void {
-    _(directives)
-      .forEach(this.notifyItemShipping)
-      .groupBy(warehouse)
-      .forEach(this.notifyPackagesReady(orderId))
+  private fireNotifications(user: User, order: Order, directives: ShippingDirective[]): void {
+    _(order.packages)
+      .groupBy(warehouseFromPackage)
+      .forEach(this.notifyPackagesReady(order.id))
       .value()
+
+    _.forEach(directives, this.notifyItemShipping(user))
   }
 
-  private notifyItemShipping = (directive: ShippingDirective) => {
+  private notifyItemShipping = (user: User) => (directive: ShippingDirective) => {
     this.customerNotifications.notifyItemShipping(
-      directive.order.customerId,
-      directive.itemId
+      user.id,
+      directive.itemId,
+      directive.shippingCost
     )
   }
 
   private notifyPackagesReady = (orderId: OrderId) =>
-    (warehouseDirectives: ShippingDirective[], warehouse: string) => {
-      const packageIds = _.uniq(warehouseDirectives.map(d => d.package.id))
+    (packages: Package[], warehouse: string) => {
+      const packageIds = _.map(packages, p => p.id)
+
       this.warehouseSystem.notifyPackagesReady(Warehouse(warehouse), orderId, packageIds)
     }
 }
@@ -89,3 +92,5 @@ const toItems = (order: Order) => (pkg: Package): ItemInfo[] =>
 
 const warehouse =
   (withPackage: { package: Package }) => withPackage.package.warehouse
+
+const warehouseFromPackage = (pkg: Package) => pkg.warehouse

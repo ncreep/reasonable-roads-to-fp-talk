@@ -1,4 +1,4 @@
-import { UserId, OrderId, PackageId, ItemId, Warehouse, Item, Package, Order, ShippingDirective, ConsolidationDiscount } from './types'
+import { UserId, OrderId, PackageId, ItemId, Warehouse, Item, Package, Order, ShippingDirective, ConsolidationDiscount, ShippingCost } from './types'
 import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, withDiscount, type User } from './utils'
 
 export const WarehouseSystem = {
@@ -24,7 +24,7 @@ export const CustomerNotifications = {
     this.initialized = true
   },
 
-  notifyItemShipping(customerId: UserId, itemId: ItemId): void {
+  notifyItemShipping(customerId: UserId, itemId: ItemId, shippingCost: ShippingCost): void {
     if (!this.initialized) throw new Error('CustomerNotifications not initialized')
   }
 }
@@ -62,7 +62,6 @@ export const OrderFetcher = {
 
   fetch(orderId: OrderId): Order {
     if (!this.initialized) throw new Error('OrderFetcher not initialized')
-    const customerId = DB.getOrderCustomer(orderId)
     const packageData = DB.getOrderPackages(orderId)
 
     const packages: Package[] = []
@@ -92,7 +91,6 @@ export const OrderFetcher = {
 
     return {
       id: orderId,
-      customerId,
       packages
     }
   }
@@ -123,9 +121,9 @@ export function processShipping(orderId: OrderId, user: User): void {
     warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
 
     for (const item of pkg.items) {
-      CustomerNotifications.notifyItemShipping(order.customerId, item.id)
-
       const shippingCost = calculateShippingCost(item.weight, item.price)
+
+      CustomerNotifications.notifyItemShipping(user.id, item.id, shippingCost)
 
       directives.push({
         order,

@@ -2,22 +2,33 @@ import { OrderId, Warehouse, Order, ShippingDirective, WarehouseSystem, Customer
 import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, withDiscount, type User } from './utils'
 
 export class OrderFulfillmentService {
+  private readonly shippingDirectivesCalc: ShippingDirectivesCalculator
+
   constructor(
     private readonly orderFetcher: OrderFetcher,
-    private readonly warehouseSystem: WarehouseSystem,
-    private readonly customerNotifications: CustomerNotifications,
+    warehouseSystem: WarehouseSystem,
+    customerNotifications: CustomerNotifications,
     private readonly shippingHandler: ShippingHandler
-  ) { }
+  ) {
+    this.shippingDirectivesCalc = new ShippingDirectivesCalculator(warehouseSystem, customerNotifications)
+  }
 
   processShipping(orderId: OrderId, user: User): void {
     const order = this.orderFetcher.fetch(orderId)
 
-    const directives = this.calculateShippingDirectives(order, user)
+    const directives = this.shippingDirectivesCalc.calculate(order, user)
 
     this.shippingHandler.dispatch(directives)
   }
+}
 
-  private calculateShippingDirectives(order: Order, user: User): ShippingDirective[] {
+class ShippingDirectivesCalculator {
+  constructor(
+    private readonly warehouseSystem: WarehouseSystem,
+    private readonly customerNotifications: CustomerNotifications,
+  ) { }
+
+  calculate(order: Order, user: User): ShippingDirective[] {
     const directives: ShippingDirective[] = []
     const warehouseCounts = new Map<Warehouse, number>()
 
@@ -28,9 +39,9 @@ export class OrderFulfillmentService {
       warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
 
       for (const item of pkg.items) {
-        this.customerNotifications.notifyItemShipping(order.customerId, item.id)
-
         const shippingCost = calculateShippingCost(item.weight, item.price)
+
+        this.customerNotifications.notifyItemShipping(user.id, item.id, shippingCost)
 
         directives.push({
           order,

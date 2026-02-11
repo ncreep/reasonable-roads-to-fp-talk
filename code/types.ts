@@ -78,7 +78,6 @@ export type Package = {
 
 export type Order = {
   readonly id: OrderId
-  readonly customerId: UserId
   readonly packages: Package[]
 }
 
@@ -97,7 +96,7 @@ export interface WarehouseSystem {
 }
 
 export interface CustomerNotifications {
-  notifyItemShipping(customerId: UserId, itemId: ItemId): void
+  notifyItemShipping(customerId: UserId, itemId: ItemId, shippingCost: ShippingCost): void
 }
 
 export interface OrderFetcher {

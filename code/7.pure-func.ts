@@ -7,22 +7,26 @@ export class OrderFulfillmentService {
     private readonly warehouseSystem: WarehouseSystem,
     private readonly customerNotifications: CustomerNotifications,
     private readonly shippingHandler: ShippingHandler
-  ) {}
+  ) { }
 
   processShipping(orderId: OrderId, user: User): void {
     const order = this.orderFetcher.fetch(orderId)
 
     const directives = calculateShippingDirectives(order, user)
 
-    for (const pkg of order.packages) {
-      this.warehouseSystem.notifyPackageReady(pkg.warehouse, orderId, pkg.id)
-
-      for (const item of pkg.items) {
-        this.customerNotifications.notifyItemShipping(order.customerId, item.id)
-      }
-    }
+    this.fireNotifications(user, order, directives)
 
     this.shippingHandler.dispatch(directives)
+  }
+
+  private fireNotifications(user: User, order: Order, directives: ShippingDirective[]) {
+    for (const pkg of order.packages) {
+      this.warehouseSystem.notifyPackageReady(pkg.warehouse, order.id, pkg.id)
+    }
+
+    for (const directive of directives) {
+      this.customerNotifications.notifyItemShipping(user.id, directive.itemId, directive.shippingCost)
+    }
   }
 }
 
