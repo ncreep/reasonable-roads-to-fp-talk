@@ -71,25 +71,30 @@ export const OrderFetcher = {
     const customerId = DB.getOrderCustomer(orderId)
     const packageData = DB.getOrderPackages(orderId)
 
-    const packages: Package[] = packageData.map(pkgData => {
-      let items: Item[] = []
+    const packages: Package[] = []
+
+    for (const pkgData of packageData) {
+      const items: Item[] = []
 
       for (const itemId of pkgData.itemIds) {
+        let item: Item
+
         if (this.itemCache.has(itemId)) {
-          items.push(this.itemCache.get(itemId)!)
+          item = (this.itemCache.get(itemId)!)
         } else {
-          const item = DB.getItemById(itemId)
+          item = DB.getItemById(itemId)
           this.itemCache.set(item.id, item)
-          items.push(item)
         }
+
+        items.push(item)
       }
 
-      return {
+      packages.push({
         id: pkgData.packageId,
         warehouse: pkgData.warehouse,
         items
-      }
-    })
+      })
+    }
 
     return {
       id: orderId,
