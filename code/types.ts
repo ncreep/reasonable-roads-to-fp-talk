@@ -30,16 +30,43 @@ export namespace Label {
   export const VIP_CUSTOMER: Label = Label('VIP_CUSTOMER')
 }
 
+export type ItemName = { readonly value: string }
+export const ItemName = (value: string): ItemName => ({ value })
+
+export type Price = { readonly value: number }
+export const Price = (value: number): Price => ({ value })
+
+export type Weight = { readonly value: number }
+export const Weight = (value: number): Weight => ({ value })
+
+export type ShippingCost = { readonly value: number }
+export const ShippingCost = (value: number): ShippingCost => ({ value })
+
+export type ConsolidationDiscount = { readonly value: number }
+
+export function ConsolidationDiscount(value: number): ConsolidationDiscount {
+  return { value }
+}
+
+export namespace ConsolidationDiscount {
+  export const zero: ConsolidationDiscount = ConsolidationDiscount(0)
+}
+
+export enum MembershipLevel {
+  regular = 'regular',
+  premium = 'premium'
+}
+
 export type User = {
   readonly id: UserId
-  readonly membershipLevel: "regular" | "premium"
+  readonly membershipLevel: MembershipLevel
 }
 
 export type Item = {
   readonly id: ItemId
-  readonly name: string
-  readonly price: number
-  readonly weight: number
+  readonly name: ItemName
+  readonly price: Price
+  readonly weight: Weight
   readonly labels: readonly Label[]
 }
 
@@ -59,9 +86,9 @@ export type ShippingDirective = {
   readonly order: Order
   readonly package: Package
   readonly itemId: ItemId
-  readonly shippingCost: number
+  readonly shippingCost: ShippingCost
   readonly labels: readonly Label[]
-  readonly consolidationDiscount: number
+  readonly consolidationDiscount: ConsolidationDiscount
 }
 
 export type WarehouseSystem = {

@@ -1,4 +1,4 @@
-import { OrderId, Warehouse, ShippingDirective, WarehouseSystem, CustomerNotifications, OrderFetcher, ShippingHandler } from './types'
+import { OrderId, Warehouse, ShippingDirective, WarehouseSystem, CustomerNotifications, OrderFetcher, ShippingHandler, ConsolidationDiscount } from './types'
 import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, withDiscount, type User } from './utils'
 
 export type { WarehouseSystem, CustomerNotifications, OrderFetcher, ShippingHandler }
@@ -34,7 +34,7 @@ export class OrderFulfillmentService {
           itemId: item.id,
           labels: withPremiumLabels(user, item.labels),
           shippingCost,
-          consolidationDiscount: 0
+          consolidationDiscount: ConsolidationDiscount.zero
         })
       }
     }

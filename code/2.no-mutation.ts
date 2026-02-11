@@ -1,4 +1,4 @@
-import { UserId, OrderId, PackageId, ItemId, Warehouse, Item, Package, Order, ShippingDirective } from './types'
+import { UserId, OrderId, PackageId, ItemId, Warehouse, Item, Package, Order, ShippingDirective, ConsolidationDiscount } from './types'
 import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels, withDiscount, type User } from './utils'
 
 export const WarehouseSystem = {
@@ -94,7 +94,7 @@ export function processShipping(orderId: OrderId, user: User): void {
         itemId: item.id,
         labels: withPremiumLabels(user, item.labels),
         shippingCost,
-        consolidationDiscount: 0
+        consolidationDiscount: ConsolidationDiscount.zero
       })
     }
   }

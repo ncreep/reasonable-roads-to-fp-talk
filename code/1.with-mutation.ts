@@ -1,16 +1,16 @@
-import { UserId, OrderId, PackageId, ItemId, Warehouse, Label } from './types'
+import { UserId, OrderId, PackageId, ItemId, Warehouse, Label, ItemName, Price, Weight, MembershipLevel, ShippingCost, ConsolidationDiscount } from './types'
 import { getConsolidationDiscount, calculateShippingCost } from './utils'
 
 export type User = {
   id: UserId
-  membershipLevel: string
+  membershipLevel: MembershipLevel
 }
 
 export type Item = {
   id: ItemId
-  name: string
-  price: number
-  weight: number
+  name: ItemName
+  price: Price
+  weight: Weight
   labels: Label[]
 }
 
@@ -30,9 +30,9 @@ export type ShippingDirective = {
   order: Order
   package: Package
   itemId: ItemId
-  shippingCost: number
+  shippingCost: ShippingCost
   labels: Label[]
-  consolidationDiscount: number
+  consolidationDiscount: ConsolidationDiscount
 }
 
 export const WarehouseSystem = {
@@ -108,7 +108,7 @@ export const ShippingHandler = {
 export function processShipping(orderId: OrderId, user: User): void {
   const order = OrderFetcher.fetch(orderId)
 
-  if (user.membershipLevel === 'premium') {
+  if (user.membershipLevel === MembershipLevel.premium) {
     for (const pkg of order.packages) {
       for (const item of pkg.items) {
         item.labels.push(Label.PRIORITY)
@@ -137,7 +137,7 @@ export function processShipping(orderId: OrderId, user: User): void {
         itemId: item.id,
         labels: item.labels,
         shippingCost,
-        consolidationDiscount: 0
+        consolidationDiscount: ConsolidationDiscount.zero
       })
     }
   }
