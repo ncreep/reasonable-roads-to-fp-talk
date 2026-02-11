@@ -91,19 +91,19 @@ export type ShippingDirective = {
   readonly consolidationDiscount: ConsolidationDiscount
 }
 
-export type WarehouseSystem = {
+export interface WarehouseSystem {
   notifyPackageReady(warehouse: Warehouse, orderId: OrderId, packageId: PackageId): void
   notifyPackagesReady(warehouse: Warehouse, orderId: OrderId, packages: PackageId[]): void
 }
 
-export type CustomerNotifications = {
+export interface CustomerNotifications {
   notifyItemShipping(customerId: UserId, itemId: ItemId): void
 }
 
-export type OrderFetcher = {
+export interface OrderFetcher {
   fetch(orderId: OrderId): Order
 }
 
-export type ShippingHandler = {
+export interface ShippingHandler {
   dispatch(directives: ShippingDirective[]): void
 }
