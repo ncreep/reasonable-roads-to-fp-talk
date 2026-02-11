@@ -1,4 +1,4 @@
-import { type User, type ShippingDirective } from './types'
+import { type User, type ShippingDirective, Label } from './types'
 
 export type { User }
 
@@ -13,9 +13,9 @@ export function calculateShippingCost(weight: number, price: number): number {
   return weight * 2.5 + (price > 100 ? 0 : 5)
 }
 
-export const withPremiumLabels = (user: User, labels: readonly string[]): readonly string[] =>
+export const withPremiumLabels = (user: User, labels: readonly Label[]): readonly Label[] =>
   user.membershipLevel === 'premium'
-    ? [...labels, 'PRIORITY', 'VIP_CUSTOMER']
+    ? [...labels, Label.PRIORITY, Label.VIP_CUSTOMER]
     : labels
 
 export const withDiscount = (directive: ShippingDirective, consolidationDiscount: number): ShippingDirective => ({

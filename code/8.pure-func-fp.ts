@@ -1,4 +1,4 @@
-import { OrderId, Warehouse, User, Item, Package, Order, ShippingDirective, WarehouseSystem, CustomerNotifications, OrderFetcher, ShippingHandler } from './types'
+import { OrderId, Warehouse, User, Item, Package, Order, ShippingDirective, WarehouseSystem, CustomerNotifications, OrderFetcher, ShippingHandler, Label } from './types'
 import { getConsolidationDiscount, calculateShippingCost, withPremiumLabels } from './utils'
 import _ from 'lodash'
 
@@ -6,7 +6,7 @@ export type ItemInfo = {
   readonly order: Order
   readonly package: Package
   readonly item: Item
-  readonly labels: readonly string[]
+  readonly labels: readonly Label[]
 }
 
 export class OrderFulfillmentService {

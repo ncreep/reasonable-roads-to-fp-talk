@@ -19,6 +19,17 @@ export const ItemId = (value: string): ItemId => ({ value })
 export type Warehouse = { readonly value: string }
 export const Warehouse = (value: string): Warehouse => ({ value })
 
+export type Label = { readonly value: string }
+
+export function Label(value: string): Label {
+  return { value }
+}
+
+export namespace Label {
+  export const PRIORITY: Label = Label('PRIORITY')
+  export const VIP_CUSTOMER: Label = Label('VIP_CUSTOMER')
+}
+
 export type User = {
   readonly id: UserId
   readonly membershipLevel: "regular" | "premium"
@@ -29,7 +40,7 @@ export type Item = {
   readonly name: string
   readonly price: number
   readonly weight: number
-  readonly labels: readonly string[]
+  readonly labels: readonly Label[]
 }
 
 export type Package = {
@@ -49,7 +60,7 @@ export type ShippingDirective = {
   readonly package: Package
   readonly itemId: ItemId
   readonly shippingCost: number
-  readonly labels: readonly string[]
+  readonly labels: readonly Label[]
   readonly consolidationDiscount: number
 }
 
