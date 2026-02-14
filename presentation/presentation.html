@@ -1,0 +1,1179 @@
+<!doctype html>
+<html>
+  <head>
+    <title>All (Reasonable) Roads Lead to Functional Programming</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle, transition, intro
+
+# All (Reasonable) Roads Lead to Functional Programming
+
+.horizontalCentered.caption[Daniel Beskin]
+
+---
+
+.centered.ai[AI]
+
+---
+
+layout: true
+
+## About ~Me
+
+---
+
+- Java at university
+
+--
+
+- "Full stack" developer: PHP + JS
+
+--
+
+- Even more deeply in Java
+--
+
+- Accidental functional enlightenment: Scala
+
+--
+
+- Told a room full of PHP developers that "I hate PHP"
+--
+
+- ... 10 years later...
+--
+
+- Still preaching the faith
+
+---
+
+layout: false
+class: middle, transition
+
+
+> I've been involved in a number of cults both as a leader and a follower. <br />
+You have more fun as a follower but you make more money as a leader.
+
+.footnote[Creed Bratton, The Office]
+
+---
+
+layout: true
+
+## What is Functional Programming?
+
+---
+
+.centered.bigCode[
+```haskell
+fibs = 0 : 1 : zipWith (+) fibs (tail fibs)
+```
+]
+
+???
+- Using Fibonacci is a recurring example when talking about FP
+- It's as elegant as it is useless
+- I heard someone using Fibonacci for stress-testing a server
+- But I really can't think of any other use for it
+
+---
+
+- Just like OOP, there's no single good definition
+--
+
+- "You know it when you see it"
+--
+
+- A minimalistic definition:
+> Putting the usage of **pure functions** to the forefront
+
+--
+- ...
+
+--
+- Who cares?
+
+---
+
+layout: true
+
+## We All Have Problems
+
+---
+---
+
+- Maintainability
+--
+
+- Testability
+--
+
+- Reusability
+--
+
+- More words that end with "...ability"
+
+--
+
+- None of these mention "pure function-ability"
+
+---
+
+layout: false
+class: middle, transition
+
+
+> Boy have you done lost your mind?<br />
+'Cause I'll HELP you find it!
+
+.footnote[Stanley Hudson, The Office]
+
+---
+
+layout: true
+
+## The Effective Java Road
+
+---
+
+---
+
+- Item 15: Minimize mutability
+
+--
+
+- Item 39: Make defensive copies when needed
+- Item 66: Synchronize access to shared mutable data
+- Item 67: Avoid excessive synchronization
+
+???
+- There are fewer moving parts
+- It's easier to maintain invariants
+- Set them once and not worry about them ever changing
+- Immutable objects are safely shareable, no need for defensive copying
+
+--
+
+<br />
+
+> Make every field final unless there is a compelling reason to make it nonfinal.
+
+---
+
+layout: true
+
+## The Miško Hevery Road
+---
+
+???
+- Misko is the creator of the original AngularJS
+---
+
+From [Google's Guide to Writing Testable Code](https://github.com/mhevery/guide-to-testable-code):
+
+--
+
+> Spooky Action at a Distance is when we run one thing that we believe is isolated ...  but unexpected interactions and state changes happen in distant locations of the system.
+<br />...
+
+--
+
+> Spooky Action at a Distance forces developers to **read every line of code to understand the potential interactions**, lowers developer productivity, and confuses new team members.
+
+---
+layout: true
+
+## The Pragmatic Programmer Road
+
+---
+---
+
+- Tip 11: DRY - Don't Repeat Yourself
+--
+
+- Tip 12: Make it easy to reuse
+--
+
+- Tip 13: Eliminate effects between unrelated things
+--
+
+- Tip 53: Abstractions live longer than details
+
+---
+
+layout: false
+class: middle, transition
+
+> And I knew exactly what to do.
+<br /> But in a much more real sense, I had no idea what to do.
+
+.footnote[Michael Scott, The Office]
+
+---
+
+## Yet Another Shopping Example
+
+--
+
+```ts
+function processShipping(orderId: OrderId, user: User) {
+{{content}}
+```
+--
+  const order = OrderFetcher.fetch(orderId)
+{{content}}
+--
+
+  const directives = []
+{{content}}
+--
+
+  // ... build shipping directives
+{{content}}
+--
+
+  ShippingHandler.dispatch(directives)
+}
+
+---
+## A Product Manager Steps In...
+
+.centered.kramer[![](./kramer-entrance.png)]
+
+---
+
+layout: true
+
+## Just a Little Bit `if`
+
+---
+
+---
+
+```ts
+type Order = {
+  id: OrderId
+  packages: Package[]
+}
+{{content}}
+```
+--
+
+type Package = {
+  id: PackageId
+  warehouse: Warehouse
+  items: Item[]
+}
+{{content}}
+--
+
+type Item = {
+  id: ItemId
+  name: ItemName
+  price: Price
+  weight: Weight
+  labels: Label[]
+}
+
+---
+
+```ts
+function processShipping(orderId: OrderId, user: User) {
+  const order = OrderFetcher.fetch(orderId)
+
+  const directives = []
+
+  // ... build shipping directives
+
+  ShippingHandler.dispatch(directives)
+}
+```
+
+---
+
+```ts
+function processShipping(orderId: OrderId, user: User) {
+  const order = OrderFetcher.fetch(orderId)
+
+  const directives = []
+
+  if (user.membershipLevel === MembershipLevel.premium) {
+{{content}}  }
+
+  // ... build shipping directives
+
+  ShippingHandler.dispatch(directives)
+}
+```
+
+--
+    for (const pkg of order.packages) {
+      for (const item of pkg.items) {
+{{content}}
+      }
+    }
+--
+*       item.labels.push(Label.PRIORITY)
+*       item.labels.push(Label.VIP_CUSTOMER)
+---
+
+layout: true
+
+## A Manager Steps In...
+
+---
+
+> Uh, we have sort of a problem here. Umm yeaaaaah...
+
+.centered.officeSpaceBoss[![](./office-space-boss.png)]
+--
+
+.officeSpaceQuote[
+> Yeaaaaah, I'm gonna need you to go ahead and come in on Saturday...
+]
+
+---
+
+```ts
+const OrderFetcher = {
+  fetch(orderId: OrderId): Order {
+{{content}}
+```
+
+--
+    const packageData = DB.getOrderPackages(orderId)
+{{content}}
+--
+
+    // ...
+
+    for (const pkgData of packageData) {
+      for (const itemId of pkgData.itemIds) {
+{{content}}
+--
+*       const item = DB.getItemById(itemId)
+
+        // ...
+
+---
+
+```ts
+const OrderFetcher = {
+* itemCache: new Map<ItemId, Item>(),
+
+  fetch(orderId: OrderId): Order {
+    const packageData = DB.getOrderPackages(orderId)
+
+    // ...
+
+    for (const pkgData of packageData) {
+      for (const itemId of pkgData.itemIds) {
+        const item = DB.getItemById(itemId)
+
+        // ...
+```
+
+---
+
+```ts
+const OrderFetcher = {
+  itemCache: new Map<ItemId, Item>(),
+
+  fetch(orderId: OrderId): Order {
+    const packageData = DB.getOrderPackages(orderId)
+
+    // ...
+
+    for (const pkgData of packageData) {
+      for (const itemId of pkgData.itemIds) {
+        let item: Item
+
+*       if (this.itemCache.has(itemId)) {
+          item = (this.itemCache.get(itemId)!)
+        } else {
+          item = DB.getItemById(itemId)
+          this.itemCache.set(item.id, item)
+        }
+
+        // ...
+```
+---
+layout: true
+
+## The Accountant Steps In...
+---
+
+.centered.accountant[![](./the-accountant.png)]
+
+---
+
+
+```ts
+function processShipping(orderId, user) {
+* const order = OrderFetcher.fetch(orderId)
+
+  const directives = []
+
+  if (user.membershipLevel === MembershipLevel.premium) {
+    for (const pkg of order.packages) {
+      for (const item of pkg.items) {
+*       item.labels.push(Label.PRIORITY)
+*       item.labels.push(Label.VIP_CUSTOMER)
+      }
+    }
+  }
+
+  // ... build shipping directives
+
+  ShippingHandler.dispatch(directives)
+}
+```
+
+???
+- Mutating data like this opens up a "secret" communication channel between different places in code
+- It's secret because it's not obvious because it's not part of the "official" outputs of the method
+- You have to check the code line by line to find it
+- Here we communicated with anyone who uses the cache
+
+---
+
+layout: true
+
+## Go Immutable
+
+---
+
+```ts
+type Item = {
+  id: ItemId
+  name: ItemName
+  price: Price
+  weight: Weight
+  labels: Label[]
+}
+```
+
+---
+
+```ts
+type Item = {
+  readonly id: ItemId
+  readonly name: ItemName
+  readonly price: Price
+  readonly weight: Weight
+* readonly labels: readonly Label[]
+}
+```
+
+---
+
+```ts
+if (user.membershipLevel === MembershipLevel.premium) {
+    for (const pkg of order.packages) {
+      for (const item of pkg.items) {
+        item.labels.push(Label.PRIORITY)
+        item.labels.push(Label.VIP_CUSTOMER)
+      }
+    }
+  }
+```
+
+--
+
+
+<pre class="remark-code">
+<span style="color: crimson;">error</span> TS2339: Property 'push' does not exist
+on type 'readonly Label[]'.
+85         item.labels.push(Label.PRIORITY)
+                       <span style="color: crimson;">~~~~</span>
+
+<span style="color: crimson;">error</span> TS2339: Property 'push' does not exist
+on type 'readonly Label[]'.
+
+86         item.labels.push(Label.VIP_CUSTOMER)
+                       <span style="color: crimson;">~~~~</span>
+</pre>
+
+
+???
+- In dynamic languages where you can't have compile-time error for immutable data
+- You can at least "freeze" the object and have a fail-fast error when mutating it
+- So at least the buggy behavior won't go far away in space and time from its origin
+
+---
+
+layout: false
+class: middle, transition
+
+> I don't hate it. <br />
+I just don't like it at all and it's terrible.
+
+.footnote[Michael Scott, The Office]
+
+---
+
+layout: true
+
+## Testin' All Day Long
+
+---
+---
+
+```ts
+describe('processShipping', () => {
+  it('should process shipping', () => {
+    const orderId = // ...
+    const user = // ...
+
+    processShipping(orderId, user)
+  })
+})
+```
+
+--
+
+<pre class="remark-code">
+<span style="color: crimson;">FAIL</span> processShipping > should process shipping
+<span style="color: crimson;">Error</span>: OrderFetcher not initialized
+</pre>
+
+---
+
+```ts
+describe('processShipping', () => {
+  it('should process shipping', () => {
+*   OrderFetcher.init()
+
+    const orderId = // ...
+    const user = // ...
+
+    processShipping(orderId, user)
+  })
+})
+```
+
+--
+
+<pre class="remark-code">
+<span style="color: crimson;">FAIL</span> processShipping > should process shipping
+<span style="color: crimson;">Error</span>: DB not initialized
+</pre>
+
+---
+
+```ts
+describe('processShipping', () => {
+  it('should process shipping', () => {
+*   DB.init()
+    OrderFetcher.init()
+
+    const orderId = // ...
+    const user = // ...
+
+    processShipping(orderId, user)
+  })
+})
+```
+---
+```ts
+describe('processShipping', () => {
+  it('should process shipping', () => {
+    DB.init()
+    OrderFetcher.init()
+*   WarehouseSystem.init()
+*   CustomerNotifications.init()
+*   ShippingHandler.init()
+
+    const orderId = // ...
+    const user = // ...
+
+    processShipping(orderId, user)
+  })
+})
+```
+
+---
+
+layout: true
+## All Hell Breaks Loose
+
+---
+
+.threatTriple.kramerTriple[![](./kramer-entrance.png)]
+.threatTriple.officeSpaceBossTriple[![](./office-space-boss.png)]
+.threatTriple.accountantTriple[![](./the-accountant.png)]
+
+---
+
+```ts
+describe('processShipping', () => {
+  it('should process shipping', () => {
+    DB.init()
+    OrderFetcher.init()
+    WarehouseSystem.init()
+    CustomerNotifications.init()
+    ShippingHandler.init()
+
+    const orderId = // ...
+    const user = // ...
+
+    processShipping(orderId, user)
+  })
+})
+```
+---
+
+```ts
+describe('processShipping', () => {
+  it('should process shipping', () => {
+    DB.init({ test: true })
+    OrderFetcher.init({ test: true })
+    WarehouseSystem.init({ test: true })
+    CustomerNotifications.init({ test: true })
+    ShippingHandler.init({ test: true })
+
+    const orderId = // ...
+    const user = // ...
+
+    processShipping(orderId, user)
+  })
+})
+```
+
+---
+
+layout: true
+
+## DI to the Rescue
+
+---
+
+```ts
+interface OrderFetcher {
+  fetch(orderId: OrderId): Order
+}
+```
+---
+
+```ts
+class OrderFulfillmentService {
+  constructor(
+    orderFetcher: OrderFetcher,
+    warehouseSystem: WarehouseSystem,
+    customerNotifications: CustomerNotifications,
+    shippingHandler: ShippingHandler
+  ) {}
+{{content}}
+```
+--
+
+  processShipping(orderId: OrderId, user: User) {
+    const order = this.orderFetcher.fetch(orderId)
+
+    // ...
+
+    this.shippingHandler.dispatch(directives)
+  }
+}
+
+---
+
+```ts
+const orderFetcher: OrderFetcher = {
+  fetch(orderId) {
+    // ... test behavior
+  }
+}
+{{content}}
+```
+--
+
+const warehouse: WarehouseSystem = // ...
+const notifications: CustomerNotifications = // ...
+const shipping: ShippingHandler = // ...
+{{content}}
+
+???
+- Notice that the DB dep in no longer needed
+- It was just an implementation detail of the hardcoded `OrderFetcher`
+- `OrderFulfillmentService` doesn't actually care about it
+--
+
+const service = new OrderFulfillmentService(
+  orderFetcher,
+  warehouse,
+  notifications,
+  shipping
+)
+{{content}}
+--
+
+*service.processShipping(orderId, user)
+
+---
+
+layout: true
+## What Are We Doing, Actually?
+---
+
+---
+
+```ts
+type ShippingDirective = {
+  readonly order: Order
+  readonly package: Package
+  readonly itemId: ItemId
+  readonly shippingCost: ShippingCost
+  readonly labels: readonly Label[]
+  readonly consolidationDiscount: ConsolidationDiscount
+}
+```
+---
+
+class: shippingCode
+
+```ts
+const order = this.orderFetcher.fetch(orderId)
+
+const directives: ShippingDirective[] = []
+const warehouseCounts = new Map<Warehouse, number>()
+
+for (const pkg of order.packages) {
+  this.warehouseSystem.notifyPackageReady(pkg.warehouse, orderId, pkg.id)
+
+  const currentCount = warehouseCounts.get(pkg.warehouse) || 0
+  warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
+
+  for (const item of pkg.items) {
+    const shippingCost = calculateShippingCost(item.weight, item.price)
+
+    this.customerNotifications.notifyItemShipping(user.id, item.id, shippingCost)
+
+    directives.push({
+      order,
+      package: pkg,
+      itemId: item.id,
+      labels: withPremiumLabels(user, item.labels),
+      shippingCost,
+      consolidationDiscount: ConsolidationDiscount.zero
+    })
+  }
+}
+
+const withDiscounts: ShippingDirective[] = []
+for (const directive of directives) {
+  const warehouseItemCount = warehouseCounts.get(directive.package.warehouse)!
+  const discount = getConsolidationDiscount(warehouseItemCount)
+  const newDirective = withDiscount(directive, discount)
+
+  withDiscounts.push(newDirective)
+}
+
+this.shippingHandler.dispatch(withDiscounts)
+```
+
+---
+class: shippingCode
+
+```ts
+*const order = this.orderFetcher.fetch(orderId)
+
+const directives: ShippingDirective[] = []
+const warehouseCounts = new Map<Warehouse, number>()
+
+for (const pkg of order.packages) {
+* this.warehouseSystem.notifyPackageReady(pkg.warehouse, orderId, pkg.id)
+
+  const currentCount = warehouseCounts.get(pkg.warehouse) || 0
+  warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
+
+  for (const item of pkg.items) {
+    const shippingCost = calculateShippingCost(item.weight, item.price)
+
+*   this.customerNotifications.notifyItemShipping(user.id, item.id, shippingCost)
+
+    directives.push({
+      order,
+      package: pkg,
+      itemId: item.id,
+      labels: withPremiumLabels(user, item.labels),
+      shippingCost,
+      consolidationDiscount: ConsolidationDiscount.zero
+    })
+  }
+}
+
+const withDiscounts: ShippingDirective[] = []
+for (const directive of directives) {
+  const warehouseItemCount = warehouseCounts.get(directive.package.warehouse)!
+  const discount = getConsolidationDiscount(warehouseItemCount)
+  const newDirective = withDiscount(directive, discount)
+
+  withDiscounts.push(newDirective)
+}
+
+*this.shippingHandler.dispatch(withDiscounts)
+```
+
+---
+
+```ts
+class ShippingDirectivesCalculator {
+  calculate(
+    order: Order, user: User): ShippingDirective[]
+}
+```
+
+---
+
+```ts
+processShipping(orderId: OrderId, user: User) {
+  const order = this.orderFetcher.fetch(orderId)
+{{content}}
+```
+--
+
+  const directives =
+    this.shippingDirectivesCalc.calculate(order, user)
+{{content}}
+--
+
+  this.shippingHandler.dispatch(directives)
+}
+---
+
+class: shippingCode
+
+```ts
+const directives: ShippingDirective[] = []
+const warehouseCounts = new Map<Warehouse, number>()
+
+for (const pkg of order.packages) {
+* this.warehouseSystem.notifyPackageReady(pkg.warehouse, order.id, pkg.id)
+
+  const currentCount = warehouseCounts.get(pkg.warehouse) || 0
+  warehouseCounts.set(pkg.warehouse, currentCount + pkg.items.length)
+
+  for (const item of pkg.items) {
+    const shippingCost = calculateShippingCost(item.weight, item.price)
+
+*   this.customerNotifications.notifyItemShipping(user.id, item.id, shippingCost)
+
+    directives.push({
+      order,
+      package: pkg,
+      itemId: item.id,
+      labels: withPremiumLabels(user, item.labels),
+      shippingCost,
+      consolidationDiscount: ConsolidationDiscount.zero
+    })
+  }
+}
+
+const withDiscounts: ShippingDirective[] = []
+for (const directive of directives) {
+  const warehouseItemCount = warehouseCounts.get(directive.package.warehouse)!
+  const discount = getConsolidationDiscount(warehouseItemCount)
+  const newDirective = withDiscount(directive, discount)
+
+  withDiscounts.push(newDirective)
+}
+
+return withDiscounts
+```
+
+---
+
+layout: true
+## No More Side-Effects
+
+---
+
+---
+
+```ts
+processShipping(orderId: OrderId, user: User) {
+  const order = this.orderFetcher.fetch(orderId)
+{{content}}
+```
+--
+
+  const directives =
+    calculateShippingDirectives(order, user)
+{{content}}
+--
+
+  this.fireNotifications(user, order, directives)
+{{content}}
+--
+
+  this.shippingHandler.dispatch(directives)
+}
+
+---
+
+```ts
+describe('calculateShippingDirectives', () => {
+  it('should calculate shipping directives', () => {
+    const order = // ...
+    const user = // ...
+
+    const expected: ShippingDirective[] = // ...
+
+    const result =
+      calculateShippingDirectives(order, user)
+
+    expect(result).toEqual(expected)
+  })
+})
+```
+???
+- Having a pure functions to test opens up the door for applying techniques like property-based testing
+
+---
+
+layout: false
+class: middle, transition
+
+> Why waste time use lot word when few word do trick?
+
+.footnote[Kevin Malone, The Office]
+
+---
+layout: true
+## Feeling a Bit DRY
+---
+
+```ts
+const directives: ShippingDirective[] = []
+
+for (const pkg of order.packages) {
+  // ...
+
+  for (const item of pkg.items) {
+    // ...
+
+    directives.push( /* ... */)
+  }
+}
+```
+---
+
+```ts
+function calculateShippingDirectives(
+  order: Order, user: User): ShippingDirective[] {
+{{content}}
+```
+--
+
+  return _(order.packages)
+    .flatMap(toItems(order))
+    .map(addPremiumLabels(user))
+    .groupBy(warehouse)
+    .flatMap(addConsolidationDiscount)
+    .value()
+}
+
+--
+- Declarative
+--
+
+- Modular
+
+---
+
+layout: true
+## Going Deeper
+
+---
+
+---
+
+```ts
+flatMap(
+  arr: Array<A>,
+  f: (a: A) => Array<B>): Array<B>
+{{content}}
+```
+--
+
+then(
+  pr: Promise<A>,
+  f: (a: A) => Promise<B>): Promise<B>
+{{content}}
+--
+
+mergeMap(
+  ob: Observable<A>,
+  f: (a: A) => Observable<B>): Observable<B>
+
+---
+
+Java
+
+```java
+Optional<B> flatMap(
+  Optional<A> opt,
+  Function<A, Optional<B>> f)
+{{content}}
+```
+--
+
+CompletableFuture<B> thenCompose(
+    CompletableFuture<A> fut,
+    Function<A, CompletableFuture<B>> f)
+---
+
+Rust
+
+```rust
+and_then(
+  res: Result<A, E>,
+  f: A -> Result<B, E>) -> Result<B, E>
+{{content}}
+```
+--
+
+flat_map(
+  parser: Parser<I, A>,
+  f: A -> Parser<I, B>) -> Parser<I, B>
+
+---
+
+```ts
+flatMap(
+  ma: M<A>,
+  f: A => M<B>): M<B>
+```
+
+--
+
+- This shape is called "Monad"
+--
+
+- Not your grandma's `AbstractFactoryFactory`...
+--
+
+- Learn once, reuse everywhere
+
+---
+
+layout: false
+class: middle, transition
+
+> I talk a lot, so I've learned to tune myself out.
+
+.footnote[Kelly Kapoor, The Office]
+
+---
+
+layout: true
+
+## Are We Pure Yet?
+
+---
+---
+
+Reasonable code:
+
+--
+- Doesn't mutate inputs
+--
+
+- Doesn't have hidden spooky outputs
+--
+
+- Is modular and reusable
+
+---
+
+~~Reasonable code~~ Pure functions:
+
+- Don't mutate inputs
+- Don't have hidden spooky outputs
+- Are modular and reusable
+
+---
+
+layout: true
+## Functional Solutions for Real Problems
+
+---
+
+---
+
+- Maintainability: reducing mutability and side-effects
+
+--
+
+- Testability: functional core, imperative shell
+
+--
+
+- Reusability: highe-order functions/abstractions
+
+---
+
+layout: true
+
+## A Brave New World
+
+---
+
+- Side-effect management
+- Immutable data structures
+- Property-based testing
+- Libraries for functional abstractions
+- Powerful concurrency
+- Functional domain modeling
+- Type driven develoment
+- ...
+
+---
+
+layout: false
+class: transition
+
+.endQuote[
+> I just want to lie on the beach and eat hot dogs.<br />
+That's all I ever wanted.
+]
+  
+.endQuote.footnote[Kevin Malone, The Office]
+
+.horizontalCentered.questions[Thank you! Questions?]
+
+.centered.githubLink[https://github.com/ncreep/reasonable-roads-to-fp-talk]
+
+.centered.linksFin.linkStackFin[[linksta.cc/@ncreep](https://linksta.cc/@ncreep)]
+
+
+
+</textarea
+    >
+    <script src="remark-0.14.0.min.js"></script>
+
+    <!-- For Scala 3 highlighting support -->
+    <link rel="stylesheet" href="highlight.11.7.0.magula.min.css" />
+    <script src="highlight.11.7.0.min.js"></script>
+    <script src="highlight.11.7.0.scala.min.js"></script>
+
+    <script>
+      // overriding the built-in highlighter with the newer version
+      remark.highlighter.engine = hljs;
+    </script>
+
+    <script type="text/javascript">
+        var slideshow = remark.create({
+      	countIncrementalSlides: false,
+        highlightLines: true,
+      	highlightLanguage: 'ts',
+      	highlightStyle: 'magula' // default, googlecode, magula, vs
+      });
+    </script>
+  </body>
+</html>
