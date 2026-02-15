@@ -78,7 +78,7 @@ export const OrderFetcher = {
         let item: Item
 
         if (this.itemCache.has(itemId)) {
-          item = (this.itemCache.get(itemId)!)
+          item = this.itemCache.get(itemId)!
         } else {
           item = DB.getItemById(itemId)
           this.itemCache.set(item.id, item)
